@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salles Libres - ESIEE</title>
+    <style>
+        /* --- LE DESIGN (CSS) --- */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: 100%;
+            text-align: center;
+        }
+        h1 {
+            color: #2c3e50;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            text-align: left;
+        }
+        input[type="datetime-local"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 20px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box; /* Pour ne pas déborder */
+        }
+        button {
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            font-size: 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background-color: #2ecc71;
+        }
+        .resultats {
+            margin-top: 25px;
+            text-align: left;
+        }
+        .salle {
+            background-color: #e8f8f5;
+            color: #117a65;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 6px;
+            font-weight: bold;
+            border-left: 5px solid #1abc9c;
+        }
+        .erreur {
+            color: #e74c3c;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Trouver une salle libre 🏫</h1>
+        
+        <label for="heureRecherche">Date et Heure :</label>
+        <input type="datetime-local" id="heureRecherche" required>
+        
+        <button onclick="chercherSalles()">Rechercher</button>
+
+        <div id="zoneResultats" class="resultats">
+            </div>
+    </div>
+
+    <script>
+        /* --- L'INTERACTIVITÉ (JavaScript) --- */
+        
+        // On met l'heure actuelle par défaut dans le champ
+        window.onload = () => {
+            const maintenant = new Date();
+            // Format requis par l'input HTML : YYYY-MM-DDTHH:mm
+            const formatLocal = maintenant.toISOString().slice(0, 16);
+            document.getElementById('heureRecherche').value = formatLocal;
+        };
+
+        async function chercherSalles() {
+            const dateChoisie = document.getElementById('heureRecherche').value;
+            const zoneResultats = document.getElementById('zoneResultats');
+            
+            if (!dateChoisie) {
+                alert("Veuillez choisir une date et une heure.");
+                return;
+            }
+
+            zoneResultats.innerHTML = "<p>⏳ Recherche en cours...</p>";
+
+            try {
+                // C'EST ICI QUE LE SITE PARLE À TON CODE JAVA !
+                // On supposera que ton serveur Java tournera sur l'adresse locale (localhost) au port 8080.
+                const reponse = await fetch('/api/salles?date=' + dateChoisie);
+                
+                if (!reponse.ok) {
+                    throw new Error("Erreur serveur");
+                }
+
+                const sallesLibres = await reponse.json(); // Le Java nous renverra une liste
+
+                // On efface le "Recherche en cours"
+                zoneResultats.innerHTML = `<h3>🟢 Salles libres (${sallesLibres.length}) :</h3>`;
+                
+                if (sallesLibres.length === 0) {
+                    zoneResultats.innerHTML += "<p>Aucune salle libre à cette heure.</p>";
+                } else {
+                    // On crée une petite case pour chaque salle
+                    sallesLibres.forEach(salle => {
+                        zoneResultats.innerHTML += `<div class="salle">${salle}</div>`;
+                    });
+                }
+
+            } catch (erreur) {
+                // Comme ton code Java n'est pas encore transformé en serveur, ça va afficher ça pour le moment :
+                zoneResultats.innerHTML = `
+                    <div class="erreur">
+                        ❌ Impossible de contacter le serveur.<br><br>
+                        (C'est normal ! Nous n'avons pas encore transformé ton code Java en serveur web.)
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>
