@@ -5,149 +5,137 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Salles Libres - ESIEE</title>
     <style>
-        /* --- LE DESIGN (CSS) --- */
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f7f6;
-            color: #333;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            max-width: 400px;
-            width: 100%;
-            text-align: center;
-        }
-        h1 {
-            color: #2c3e50;
-            font-size: 24px;
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-            text-align: left;
-        }
-        input[type="datetime-local"] {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 20px;
-            border: 1px solid #ccc;
-            border-radius: 8px;
-            font-size: 16px;
-            box-sizing: border-box; /* Pour ne pas déborder */
-        }
-        button {
-            background-color: #27ae60;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            font-size: 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            width: 100%;
-            transition: background 0.3s;
-        }
-        button:hover {
-            background-color: #2ecc71;
-        }
-        .resultats {
-            margin-top: 25px;
-            text-align: left;
-        }
-        .salle {
-            background-color: #e8f8f5;
-            color: #117a65;
-            padding: 10px;
-            margin: 5px 0;
-            border-radius: 6px;
-            font-weight: bold;
-            border-left: 5px solid #1abc9c;
-        }
-        .erreur {
-            color: #e74c3c;
-            font-weight: bold;
-            margin-top: 20px;
-        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; text-align: center; }
+        .container { background: white; max-width: 400px; margin: 0 auto; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h1 { color: #1a73e8; font-size: 24px; }
+        input { padding: 12px; margin: 10px 0; width: 90%; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; }
+        button { background-color: #1a73e8; color: white; border: none; padding: 15px; width: 100%; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        button:active { background-color: #1557b0; }
+        #resultat { margin-top: 20px; text-align: left; }
+        .salle { background: #e8f0fe; color: #1a73e8; padding: 10px; margin: 5px 0; border-radius: 8px; font-weight: bold; }
+        .loader { display: none; margin-top: 15px; font-style: italic; color: #666; }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>Trouver une salle libre 🏫</h1>
-        
-        <label for="heureRecherche">Date et Heure :</label>
-        <input type="datetime-local" id="heureRecherche" required>
-        
-        <button onclick="chercherSalles()">Rechercher</button>
+<div class="container">
+    <h1>🏫 Salles Libres ESIEE</h1>
+    <p>Trouve une salle dispo en 2 secondes !</p>
+    
+    <input type="datetime-local" id="datePicker">
+    <button onclick="chercherSalles()">Rechercher</button>
+    
+    <div id="loading" class="loader">Recherche dans l'emploi du temps... ⏳</div>
+    <div id="resultat"></div>
+</div>
 
-        <div id="zoneResultats" class="resultats">
-            </div>
-    </div>
+<script>
+    // 1. On met la date et l'heure actuelle par défaut dans le sélecteur
+    window.onload = function() {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        document.getElementById('datePicker').value = now.toISOString().slice(0, 16);
+    };
 
-    <script>
-        /* --- L'INTERACTIVITÉ (JavaScript) --- */
+    // 2. La fonction principale
+    async function chercherSalles() {
+        const resultatDiv = document.getElementById("resultat");
+        const loader = document.getElementById("loading");
+        const dateChoisie = new Date(document.getElementById("datePicker").value);
         
-        // On met l'heure actuelle par défaut dans le champ
-        window.onload = () => {
-            const maintenant = new Date();
-            // Format requis par l'input HTML : YYYY-MM-DDTHH:mm
-            const formatLocal = maintenant.toISOString().slice(0, 16);
-            document.getElementById('heureRecherche').value = formatLocal;
-        };
+        resultatDiv.innerHTML = "";
+        loader.style.display = "block";
 
-        async function chercherSalles() {
-            const dateChoisie = document.getElementById('heureRecherche').value;
-            const zoneResultats = document.getElementById('zoneResultats');
+        // Ton lien ADE ESIEE
+        const lienADE = "https://edt-consult.univ-eiffel.fr/jsp/custom/modules/plannings/anonymous_cal.jsp?resources=5480&projectId=1&calType=ical&nbWeeks=4&displayConfigId=8";
+        
+        // ASTUCE PRO : On utilise un "Proxy" gratuit car les navigateurs bloquent la lecture directe sur un autre site (sécurité CORS)
+        const proxyUrl = "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(lienADE);
+
+        try {
+            // On télécharge le calendrier
+            const response = await fetch(proxyUrl);
+            const texteIcal = await response.text();
             
-            if (!dateChoisie) {
-                alert("Veuillez choisir une date et une heure.");
-                return;
+            // On lance l'analyse (comme ton code Java)
+            const evenements = analyserIcal(texteIcal);
+            const sallesDispos = trouverSallesLibres(evenements, dateChoisie);
+
+            // On affiche le résultat
+            loader.style.display = "none";
+            if(sallesDispos.length === 0) {
+                resultatDiv.innerHTML = "<p>❌ Aucune salle libre trouvée à cette heure.</p>";
+            } else {
+                resultatDiv.innerHTML = `<p>✅ <b>${sallesDispos.length}</b> salles disponibles :</p>`;
+                sallesDispos.forEach(salle => {
+                    resultatDiv.innerHTML += `<div class="salle">${salle}</div>`;
+                });
             }
 
-            zoneResultats.innerHTML = "<p>⏳ Recherche en cours...</p>";
-
-            try {
-                // C'EST ICI QUE LE SITE PARLE À TON CODE JAVA !
-                // On supposera que ton serveur Java tournera sur l'adresse locale (localhost) au port 8080.
-                const reponse = await fetch('/api/salles?date=' + dateChoisie);
-                
-                if (!reponse.ok) {
-                    throw new Error("Erreur serveur");
-                }
-
-                const sallesLibres = await reponse.json(); // Le Java nous renverra une liste
-
-                // On efface le "Recherche en cours"
-                zoneResultats.innerHTML = `<h3>🟢 Salles libres (${sallesLibres.length}) :</h3>`;
-                
-                if (sallesLibres.length === 0) {
-                    zoneResultats.innerHTML += "<p>Aucune salle libre à cette heure.</p>";
-                } else {
-                    // On crée une petite case pour chaque salle
-                    sallesLibres.forEach(salle => {
-                        zoneResultats.innerHTML += `<div class="salle">${salle}</div>`;
-                    });
-                }
-
-            } catch (erreur) {
-                // Comme ton code Java n'est pas encore transformé en serveur, ça va afficher ça pour le moment :
-                zoneResultats.innerHTML = `
-                    <div class="erreur">
-                        ❌ Impossible de contacter le serveur.<br><br>
-                        (C'est normal ! Nous n'avons pas encore transformé ton code Java en serveur web.)
-                    </div>
-                `;
-            }
+        } catch (error) {
+            loader.style.display = "none";
+            resultatDiv.innerHTML = "<p>⚠️ Erreur lors de la récupération des données.</p>";
+            console.error(error);
         }
-    </script>
+    }
+
+    // 3. Traduction de ton parseur Java en JavaScript
+    function analyserIcal(texte) {
+        const lignes = texte.split(/\r?\n/);
+        const evenements = [];
+        let coursActuel = null;
+
+        lignes.forEach(ligne => {
+            if (ligne.startsWith("BEGIN:VEVENT")) {
+                coursActuel = { salles: [] };
+            } else if (ligne.startsWith("DTSTART:") && coursActuel) {
+                coursActuel.debut = parseDateIcal(ligne.substring(8).trim());
+            } else if (ligne.startsWith("DTEND:") && coursActuel) {
+                coursActuel.fin = parseDateIcal(ligne.substring(6).trim());
+            } else if (ligne.startsWith("LOCATION:") && coursActuel) {
+                let sallesStr = ligne.substring(9).trim().replace(/\\,/g, ",");
+                if (sallesStr) {
+                    coursActuel.salles = sallesStr.split(",").map(s => s.trim()).filter(s => s !== "");
+                }
+            } else if (ligne.startsWith("END:VEVENT") && coursActuel) {
+                if (coursActuel.debut && coursActuel.fin && coursActuel.salles.length > 0) {
+                    evenements.push(coursActuel);
+                }
+                coursActuel = null;
+            }
+        });
+        return evenements;
+    }
+
+    function parseDateIcal(chaine) {
+        // Transforme "20260328T080000Z" en vraie date
+        const y = chaine.substring(0, 4);
+        const m = chaine.substring(4, 6) - 1; // Les mois commencent à 0 en JS
+        const d = chaine.substring(6, 8);
+        const h = chaine.substring(9, 11);
+        const min = chaine.substring(11, 13);
+        const s = chaine.substring(13, 15);
+        return new Date(Date.UTC(y, m, d, h, min, s));
+    }
+
+    function trouverSallesLibres(evenements, dateRecherche) {
+        const toutesLesSalles = new Set();
+        const sallesOccupees = new Set();
+
+        evenements.forEach(cours => {
+            cours.salles.forEach(salle => toutesLesSalles.add(salle));
+            
+            // Si la date demandée tombe pendant le cours
+            if (dateRecherche >= cours.debut && dateRecherche < cours.fin) {
+                cours.salles.forEach(salle => sallesOccupees.add(salle));
+            }
+        });
+
+        // On soustrait les salles occupées de toutes les salles
+        const sallesLibres = [...toutesLesSalles].filter(salle => !sallesOccupees.has(salle));
+        return sallesLibres.sort(); // Tri alphabétique
+    }
+</script>
+
 </body>
 </html>
